@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Page</title>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<h1>Welcome User</h1>
+
+<div id="questions"></div>
+
+<script>
+let saved = JSON.parse(localStorage.getItem("questions") || "[]");
+let box = document.getElementById("questions");
+saved.forEach(q => {
+    box.innerHTML += "<p>" + q + "</p>";
+});
+</script>
+
+</body>
+</html>
