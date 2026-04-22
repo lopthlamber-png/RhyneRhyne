@@ -1,21 +1,263 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>User Page</title>
-    <link rel="stylesheet" href="assets/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi Room Chat</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #111;
+  color: white;
+}
+
+/* LOGIN */
+#login {
+  display: flex;
+  height: 100vh;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+input {
+  padding: 10px;
+  margin: 5px;
+  border-radius: 8px;
+  border: none;
+  width: 220px;
+}
+
+button {
+  padding: 10px;
+  width: 220px;
+  border: none;
+  border-radius: 8px;
+  background: #00aaff;
+  color: white;
+  font-weight: bold;
+}
+
+/* CHAT */
+#chat {
+  display: none;
+  height: 100vh;
+  flex-direction: column;
+}
+
+/* TOP BAR */
+#topbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  background: #000;
+}
+
+#roomName {
+  font-weight: bold;
+}
+
+/* MESSAGES */
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.msg {
+  background: #222;
+  margin: 5px;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+/* INPUT */
+#inputBox {
+  display: flex;
+  padding: 10px;
+  background: #000;
+}
+
+#text {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+}
+
+#send {
+  margin-left: 5px;
+  background: #00aaff;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  padding: 10px;
+}
+
+/* ROOM LIST */
+#roomList {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  padding: 20px;
+}
+
+.roomBtn {
+  width: 100%;
+  margin: 5px 0;
+  background: #222;
+}
+
+.small {
+  font-size: 12px;
+  opacity: 0.7;
+}
+</style>
 </head>
+
 <body>
 
-<h1>Welcome User</h1>
+<!-- LOGIN -->
+<div id="login">
+  <h2>Join Chat</h2>
+  <input id="username" placeholder="Enter username">
+  <input id="roomInput" placeholder="Enter room name">
+  <button onclick="join()">Join / Create Room</button>
+</div>
 
-<div id="questions"></div>
+<!-- CHAT -->
+<div id="chat">
+
+  <div id="topbar">
+    <div id="roomName">Room</div>
+    <button onclick="showRooms()">Rooms</button>
+  </div>
+
+  <div id="messages"></div>
+
+  <div id="inputBox">
+    <input id="text" placeholder="Type message...">
+    <button id="send" onclick="send()">Send</button>
+  </div>
+</div>
+
+<!-- ROOM LIST -->
+<div id="roomList">
+  <h3>Chat Rooms</h3>
+  <div class="small">Click a room to switch</div>
+  <div id="rooms"></div>
+  <button onclick="closeRooms()">Close</button>
+</div>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
-let saved = JSON.parse(localStorage.getItem("questions") || "[]");
-let box = document.getElementById("questions");
-saved.forEach(q => {
-    box.innerHTML += "<p>" + q + "</p>";
-});
+// 🔥 YOUR FIREBASE CONFIG
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "XXXX",
+  appId: "XXXX"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let username = "";
+let room = "";
+
+// JOIN ROOM
+function join() {
+  username = document.getElementById("username").value;
+  room = document.getElementById("roomInput").value;
+
+  if (!username || !room) return alert("Fill all fields!");
+
+  document.getElementById("login").style.display = "none";
+  document.getElementById("chat").style.display = "flex";
+
+  document.getElementById("roomName").innerText = "Room: " + room;
+
+  listenMessages();
+}
+
+// SEND MESSAGE (ROOM BASED)
+function send() {
+  let text = document.getElementById("text").value;
+  if (!text) return;
+
+  db.ref("rooms/" + room + "/messages").push({
+    user: username,
+    text: text,
+    time: Date.now()
+  });
+
+  document.getElementById("text").value = "";
+}
+
+// LISTEN MESSAGES
+function listenMessages() {
+  db.ref("rooms/" + room + "/messages").off();
+
+  document.getElementById("messages").innerHTML = "";
+
+  db.ref("rooms/" + room + "/messages").on("child_added", function(snapshot) {
+    let msg = snapshot.val();
+
+    let div = document.createElement("div");
+    div.className = "msg";
+    div.innerHTML = "<b>" + msg.user + ":</b> " + msg.text;
+
+    document.getElementById("messages").appendChild(div);
+    document.getElementById("messages").scrollTop =
+      document.getElementById("messages").scrollHeight;
+  });
+}
+
+// SHOW ROOMS
+function showRooms() {
+  document.getElementById("roomList").style.display = "block";
+  document.getElementById("rooms").innerHTML = "";
+
+  db.ref("rooms").once("value", function(snapshot) {
+    snapshot.forEach(function(child) {
+      let r = child.key;
+
+      let btn = document.createElement("button");
+      btn.className = "roomBtn";
+      btn.innerText = r;
+      btn.onclick = function() {
+        switchRoom(r);
+      };
+
+      document.getElementById("rooms").appendChild(btn);
+    });
+  });
+}
+
+// SWITCH ROOM
+function switchRoom(newRoom) {
+  room = newRoom;
+  document.getElementById("roomName").innerText = "Room: " + room;
+  closeRooms();
+  listenMessages();
+}
+
+// CLOSE ROOM LIST
+function closeRooms() {
+  document.getElementById("roomList").style.display = "none";
+}
 </script>
 
 </body>
